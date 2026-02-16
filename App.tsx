@@ -6,10 +6,10 @@ import {
   Share2, Trash2, Download, BookOpen, Shuffle, Plus, Settings,
   Camera, Coffee, Moon, Sun, Book, Shield, Zap, Image as ImageIcon,
   User, MessageCircle, Star, Music, Target, Palette, Twitter, Mail, Copy, Link as LinkIcon, Code, Smartphone,
-  TreePine, Flame, Cloud, Anchor, PenTool, Globe, Gift, Award, HelpCircle, ExternalLink
+  TreePine, Flame, Cloud, Anchor, PenTool, Globe, Gift, Award, HelpCircle, ExternalLink, Server, RefreshCw
 } from 'lucide-react';
 import { Category, ReflectionResponse, HistoryItem, CustomCategory } from './types';
-import { generateReflection, generateRandomReflection } from './services/geminiService';
+import { generateReflectionStream, generateRandomReflection } from './services/geminiService';
 
 /**
  * Biblioteca de ícones disponíveis para categorias.
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [newCatIcon, setNewCatIcon] = useState<string>('Sparkles');
   const [context, setContext] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
   const [result, setResult] = useState<ReflectionResponse | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeHistoryItem, setActiveHistoryItem] = useState<HistoryItem | null>(null);
@@ -136,15 +137,17 @@ const App: React.FC = () => {
 
   const handleRandomReflection = async () => {
     setLoading(true);
+    setLoadingStep('Conectando ao servidor...');
     setView('result');
     try {
+      setTimeout(() => setLoadingStep('Buscando sabedoria aleatória...'), 800);
       const res = await generateRandomReflection();
       setResult(res);
       const id = saveToHistory(res, "Aleatório", "Conselho rápido do dia");
       setActiveHistoryItem({ ...res, id, category: "Aleatório", context: "Conselho rápido do dia", timestamp: Date.now() });
     } catch (e) {
       console.error(e);
-      alert("Erro ao buscar conselho.");
+      alert("Erro ao conectar com o servidor.");
       setView('home');
     } finally {
       setLoading(false);
@@ -154,15 +157,23 @@ const App: React.FC = () => {
   const handleStartReflection = async () => {
     if (!selectedCategory || !context.trim()) return;
     setLoading(true);
+    setLoadingStep('Estabelecendo conexão segura...');
     setView('result');
     try {
-      const reflection = await generateReflection(selectedCategory, context);
+      setTimeout(() => setLoadingStep('Analisando seu contexto...'), 1000);
+      setTimeout(() => setLoadingStep('Gerando reflexão personalizada...'), 2500);
+      
+      const reflection = await generateReflectionStream(selectedCategory, context, (chunk) => {
+        // Opcionalmente poderíamos atualizar uma prévia aqui se usássemos streaming real de texto
+      });
+      
       setResult(reflection);
       const id = saveToHistory(reflection, selectedCategory, context);
       setActiveHistoryItem({ ...reflection, id, category: selectedCategory, context, timestamp: Date.now() });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Erro ao processar. Verifique sua conexão.");
+      const msg = error.status === 429 ? "Muitas requisições. Tente novamente em instantes." : "Erro no servidor. Verifique sua conexão.";
+      alert(msg);
       setView('input');
     } finally {
       setLoading(false);
@@ -460,9 +471,15 @@ const App: React.FC = () => {
         {view === 'result' && (
           <div className="animate-fade-in pb-10">
             {loading ? (
-              <div className="py-20 text-center">
-                <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mx-auto mb-6"></div>
-                <h3 className={`text-xl font-serif ${themeClasses.text}`}>Buscando clareza...</h3>
+              <div className="py-24 text-center">
+                <div className="relative w-20 h-20 mx-auto mb-8">
+                  <div className="absolute inset-0 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Server size={24} className="text-indigo-400 animate-pulse" />
+                  </div>
+                </div>
+                <h3 className={`text-xl font-serif mb-2 ${themeClasses.text}`}>{loadingStep}</h3>
+                <p className={`text-xs uppercase tracking-tighter opacity-50 ${themeClasses.text}`}>Conexão redundante ativa</p>
               </div>
             ) : result && (
               <div className="space-y-6">
